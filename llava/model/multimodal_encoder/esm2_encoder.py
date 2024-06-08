@@ -11,6 +11,8 @@ class ESMTower(nn.Module):
         self.vision_tower = None
         self.protein_processor = None
         self.is_loaded = False
+        self.device = torch.device('cpu')
+        self.dtype = torch.int64
 
         self.protein_model_host = protein_model_host
         self.protein_model_version = protein_model_version
@@ -35,6 +37,8 @@ class ESMTower(nn.Module):
         self.vision_tower, self.protein_processor = torch.hub.load(self.protein_model_host, self.protein_model_version)
         if device_map is not None:
             self.vision_tower.to(device_map)
+            self.device = device_map
+
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
@@ -68,13 +72,13 @@ class ESMTower(nn.Module):
     def dummy_feature(self):
         return torch.zeros(1, self.hidden_size, device=self.device, dtype=self.dtype)
 
-    @property
-    def dtype(self):
-        return self.vision_tower.dtype
-
-    @property
-    def device(self):
-        return self.vision_tower.device
+    # @property
+    # def dtype(self):
+    #     return self.vision_tower.dtype
+    #
+    # @property
+    # def device(self):
+    #     return self.vision_tower.device
 
 
     @property
