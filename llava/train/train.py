@@ -27,6 +27,7 @@ import torch
 import transformers
 import tokenizers
 
+import esm.data
 from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, \
     DEFAULT_IM_END_TOKEN
 from torch.utils.data import Dataset
@@ -325,10 +326,10 @@ def preprocess_multimodal(
                 if "mmtag" in conversation_lib.default_conversation.version:
                     sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN,
                                                                   '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>')
-            replace_token = DEFAULT_IMAGE_TOKEN
-            if data_args.mm_use_im_start_end:
-                replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
-            sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
+                replace_token = DEFAULT_IMAGE_TOKEN
+                if data_args.mm_use_im_start_end:
+                    replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
+                sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
 
     return sources
 
@@ -513,26 +514,17 @@ def preprocess_protein(
     # Apply prompt templates
     conversations = []
     conv.messages = []
-    START_ASK = "Describe the function of this protein: "
+    START_ASK = f"Describe the function of this protein: "
     PROTEIN_EMBEDDING_TOKEN = "<protein>"  # todo
     # подаём в ллм запрос с последовательностью (не эмбеддинги)
     # query = f'{START_ASK}{PROTEIN_EMBEDDING_TOKEN}{sources["sequence"]}'
+    # вопрос
     query = f'{START_ASK}'
     conv.append_message(roles["human"], query)
-
+    # ответ
     functions = "\n".join(sources["protein_function"])
     conv.append_message(roles["gpt"], functions)
-
     conversations.append(conv.get_prompt())
-
-    targets = tokenizer(
-            functions,
-            return_tensors="pt",
-            padding="longest",
-            max_length=tokenizer.model_max_length,
-            truncation=True,
-        ).input_ids
-
 
     # Tokenize conversations todo
     if has_image:
@@ -547,7 +539,7 @@ def preprocess_protein(
             truncation=True,
         ).input_ids
 
-    # targets = input_ids.clone()
+    targets = input_ids.clone()
 
     assert conv.sep_style == conversation_lib.SeparatorStyle.TWO
 
@@ -722,17 +714,17 @@ def preprocess(
     3. Tokenize the concatenated conversation;
     4. Make a deepcopy as the target. Mask human words with IGNORE_INDEX.
     """
-    if not is_protein:
-        if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.PLAIN:
-            return preprocess_plain(sources, tokenizer)
-        if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_2:
-            return preprocess_llama_2(sources, tokenizer, has_image=has_image)
-        if conversation_lib.default_conversation.version.startswith("v1"):
-            return preprocess_v1(sources, tokenizer, has_image=has_image)
-        if conversation_lib.default_conversation.version == "mpt":
-            return preprocess_mpt(sources, tokenizer, has_image=has_image)
-    else:
-        return preprocess_protein(sources, tokenizer)
+    # if not is_protein:
+    if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.PLAIN:
+        return preprocess_plain(sources, tokenizer)
+    if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_2:
+        return preprocess_llama_2(sources, tokenizer, has_image=has_image)
+    if conversation_lib.default_conversation.version.startswith("v1"):
+        return preprocess_v1(sources, tokenizer, has_image=has_image)
+    if conversation_lib.default_conversation.version == "mpt":
+        return preprocess_mpt(sources, tokenizer, has_image=has_image)
+    # else:
+    #     return preprocess_protein(sources, tokenizer)
 
     # add end signal and concatenate together
     conversations = []
@@ -864,12 +856,13 @@ class ProteinDataset(Dataset):
         rank0_print("Formatting inputs...Skip in lazy mode")
         self.tokenizer = tokenizer
         self.protein_tokenizer = data_args.image_processor
-        self.batch_converter = self.protein_tokenizer.get_batch_converter()
+        self.protein_batch_converter = self.protein_tokenizer.get_batch_converter()
         self.list_data_dict = list_data_dict
         self.data_args = data_args
 
     def __len__(self):
         return len(self.list_data_dict)
+
 
     @property
     def lengths(self):
@@ -887,31 +880,34 @@ class ProteinDataset(Dataset):
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         sources = self.list_data_dict[i]
-        data_dict = {}
-        # Хз че это
-        # if isinstance(i, int):
-        #     sources = [sources]
-        # assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
-        # todo туда нужно отправлять labels, но непонятно что это
-        batch_labels, batch_strs, protein_tokens = self.batch_converter([(sources["id"], sources["sequence"])])
-        sources["protein_tokens"] = protein_tokens
+        # may be return this thing
+        if isinstance(i, int):
+            sources = [sources]
+        assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
+        if 'image' in sources[0]:
+            s = self.list_data_dict[i]
+            protein = (s["id"], s["image"])
+            sources = preprocess_multimodal(
+                copy.deepcopy([e["conversations"] for e in sources]),
+                self.data_args)
+        else:
+            sources = copy.deepcopy([e["conversations"] for e in sources])
 
-        data_dict_llm = preprocess(
+        # process conversation data, has_image - append image token
+        data_dict = preprocess(
             sources,
             self.tokenizer,
-            has_image=('image' in self.list_data_dict[i]), is_protein=True)
+            has_image=('image' in self.list_data_dict[i]))
+        if isinstance(i, int):
+            data_dict = dict(input_ids=data_dict["input_ids"][0],
+                             labels=data_dict["labels"][0])
 
-        # input_ids = self.tokenizer(
-        #     sources["protein_function"],
-        #     return_tensors="pt",
-        #     padding="longest",
-        #     max_length=self.tokenizer.model_max_length,
-        #     truncation=True,
-        # ).input_ids
-
-        data_dict["input_ids"] = data_dict_llm["input_ids"]
-        data_dict['sequence'] = protein_tokens
-        data_dict["labels"] = data_dict_llm["labels"]
+        # image(protein - amino-acid-seq) exist in the data
+        if 'image' in self.list_data_dict[i]:
+            data_dict['image'] = protein
+        elif self.data_args.is_multimodal:
+            # image does not exist in the data, but the model is multimodal
+            data_dict['image'] = torch.zeros(3, 1)
         return data_dict
 
 
@@ -920,6 +916,7 @@ class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
     tokenizer: transformers.PreTrainedTokenizer
+    protein_batch_converter: esm.data.BatchConverter
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         input_ids, labels = tuple([instance[key] for instance in instances]
@@ -939,19 +936,12 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
+        # токенизируем и собираем в батч белковые последовательности
         if 'image' in instances[0]:
-            images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
-                batch['images'] = images
+            proteins = [instance['image'] for instance in instances]
+            batch_labels, batch_strs, protein_tokens = self.protein_batch_converter(proteins)
+            batch['images'] = protein_tokens
 
-        if 'image' in instances[0]:
-            images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
-                batch['images'] = images
         return batch
 
 
@@ -965,7 +955,8 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
                                    data_path=data_args.data_path,
                                    data_args=data_args)
     # TODO
-    data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
+    data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer,
+                                                     protein_batch_converter=train_dataset.protein_batch_converter)
     return dict(train_dataset=train_dataset,
                 eval_dataset=None,
                 data_collator=data_collator)
