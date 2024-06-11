@@ -45,7 +45,7 @@ class ESMTower(nn.Module):
 
     def feature_select(self, protein_forward_outs):
         # get representation from last layer
-        protein_features = protein_forward_outs["representations"][33]
+        protein_features = protein_forward_outs["representations"][self.embedding_layer]
         return protein_features
 
     @torch.no_grad()
@@ -55,12 +55,12 @@ class ESMTower(nn.Module):
             image_features = []
             for seq in sequences:
                 # todo .to(device=self.device, dtype=self.dtype)
-                protein_forward_out = self.vision_tower(seq.unsqueeze(0), repr_layers=[33], return_contacts=True)
+                protein_forward_out = self.vision_tower(seq.unsqueeze(0), repr_layers=[self.embedding_layer], return_contacts=True)
                 protein_feature = self.feature_select(protein_forward_out).to(seq.dtype)
                 image_features.append(protein_feature)
         else:
             # todo .to(device=self.device, dtype=self.dtype)
-            image_forward_outs = self.vision_tower(sequences, repr_layers=[33], return_contacts=True)
+            image_forward_outs = self.vision_tower(sequences, repr_layers=[self.embedding_layer], return_contacts=True)
             image_features = self.feature_select(image_forward_outs).to(sequences.dtype)
 
         return image_features
@@ -76,11 +76,14 @@ class ESMTower(nn.Module):
     # @property
     # def device(self):
     #     return self.vision_tower.device
-
+    @property
+    def embedding_layer(self):
+        return self.vision_tower.num_layers
 
     @property
     def hidden_size(self):
         return self.config.hidden_size
+
 
     @property
     def num_patches_per_side(self):
