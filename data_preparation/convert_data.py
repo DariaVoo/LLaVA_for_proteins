@@ -1,5 +1,8 @@
 import argparse
 import copy
+import os
+from pathlib import Path
+
 from Bio import SeqIO
 import json
 from tqdm import tqdm
@@ -37,6 +40,8 @@ if __name__ == '__main__':
 
     print("Count no function proteins:\t", count_not_function)
     print("Count proteins with functions:\t", len(seq_records))
+    path = Path(args.result_path)
+    os.makedirs(path.parent.absolute(), exist_ok=True)
     with open(args.result_path, "w", encoding="utf-8") as file:
         json.dump(seq_records, fp=file, ensure_ascii=False, indent=4)
 
