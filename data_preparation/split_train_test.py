@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     with open(path_train, "w", encoding="utf-8") as file:
         json.dump(train, fp=file, ensure_ascii=False, indent=4)
-    print(f"Train count samples: {len(train)}\nSaved to {path_train}.\n")
+    print(f"Train count samples: {len(train)}\nSaved to {path_train}\n")
     with open(path_test, "w", encoding="utf-8") as file:
         json.dump(test, fp=file, ensure_ascii=False, indent=4)
     print(f"Test count samples: {len(test)}\nSaved to {path_test}")
