@@ -1,7 +1,7 @@
 import torch
 # import matplotlib.pyplot as plt
 
-from esm_project import esm
+import esm
 
 if __name__ == '__main__':
 

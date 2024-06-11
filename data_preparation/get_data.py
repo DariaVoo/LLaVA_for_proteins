@@ -5,8 +5,8 @@ from tqdm import tqdm
 
 
 if __name__ == '__main__':
-    src_path = "/Users//Downloads/uniprot_sprot.xml"
-    jsonFilePath = "/Users//PycharmProjects/hse/data_protein/protein_data_mini_200k.json"
+    src_path = "/Users//PycharmProjects/LLaVA_for_proteins/data/uniprot_sprot.xml"
+    jsonFilePath = "/Users//PycharmProjects/LLaVA_for_proteins/data/protein_data_mini_200k.json"
 
     seq_records = []
     count_not_function = 0

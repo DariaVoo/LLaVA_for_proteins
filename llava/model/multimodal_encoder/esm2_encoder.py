@@ -12,7 +12,7 @@ class ESMTower(nn.Module):
         self.protein_processor = None
         self.is_loaded = False
         self.device = torch.device('cpu')
-        self.dtype = torch.int64
+        self.dtype = torch.float32
 
         self.protein_model_host = protein_model_host
         self.protein_model_version = protein_model_version
@@ -59,11 +59,13 @@ class ESMTower(nn.Module):
         if type(sequences) is list:
             image_features = []
             for seq in sequences:
-                protein_forward_out = self.vision_tower(seq.to(device=self.device, dtype=self.dtype).unsqueeze(0))
+                # todo .to(device=self.device, dtype=self.dtype)
+                protein_forward_out = self.vision_tower(seq.unsqueeze(0))
                 protein_feature = self.feature_select(protein_forward_out).to(seq.dtype)
                 image_features.append(protein_feature)
         else:
-            image_forward_outs = self.vision_tower(sequences.to(device=self.device, dtype=self.dtype))
+            # todo .to(device=self.device, dtype=self.dtype)
+            image_forward_outs = self.vision_tower(sequences)
             image_features = self.feature_select(image_forward_outs).to(sequences.dtype)
 
         return image_features
