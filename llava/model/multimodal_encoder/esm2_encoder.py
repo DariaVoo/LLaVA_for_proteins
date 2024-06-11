@@ -44,7 +44,8 @@ class ESMTower(nn.Module):
         self.is_loaded = True
 
     def feature_select(self, protein_forward_outs):
-        protein_features = protein_forward_outs["representations"]
+        # get representation from last layer
+        protein_features = protein_forward_outs["representations"][-1]
         return protein_features
 
     @torch.no_grad()
