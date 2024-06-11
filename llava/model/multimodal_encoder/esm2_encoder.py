@@ -45,7 +45,7 @@ class ESMTower(nn.Module):
 
     def feature_select(self, protein_forward_outs):
         # get representation from last layer
-        protein_features = protein_forward_outs["representations"][-1]
+        protein_features = protein_forward_outs["representations"][33]
         return protein_features
 
     @torch.no_grad()
@@ -55,12 +55,12 @@ class ESMTower(nn.Module):
             image_features = []
             for seq in sequences:
                 # todo .to(device=self.device, dtype=self.dtype)
-                protein_forward_out = self.vision_tower(seq.unsqueeze(0))
+                protein_forward_out = self.vision_tower(seq.unsqueeze(0), repr_layers=[33], return_contacts=True)
                 protein_feature = self.feature_select(protein_forward_out).to(seq.dtype)
                 image_features.append(protein_feature)
         else:
             # todo .to(device=self.device, dtype=self.dtype)
-            image_forward_outs = self.vision_tower(sequences)
+            image_forward_outs = self.vision_tower(sequences, repr_layers=[33], return_contacts=True)
             image_features = self.feature_select(image_forward_outs).to(sequences.dtype)
 
         return image_features
