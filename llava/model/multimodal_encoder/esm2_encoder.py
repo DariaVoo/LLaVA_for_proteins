@@ -11,7 +11,7 @@ class ESMTower(nn.Module):
         self.vision_tower = None
         self.protein_processor = None
         self.is_loaded = False
-        self.device = torch.device('cpu')
+        # self.device = torch.device('cpu')
         self.dtype = torch.float32
 
         self.protein_model_host = protein_model_host
@@ -61,7 +61,7 @@ class ESMTower(nn.Module):
         else:
             # todo .to(device=self.device, dtype=self.dtype)
             image_forward_outs = self.vision_tower(sequences, repr_layers=[self.embedding_layer], return_contacts=True)
-            image_features = self.feature_select(image_forward_outs).to(sequences.dtype)
+            image_features = self.feature_select(image_forward_outs).to(self.dtype)
 
         return image_features
 
