@@ -2,11 +2,7 @@ import argparse
 import copy
 import os
 from pathlib import Path
-
-from Bio import SeqIO
 import json
-from tqdm import tqdm
-
 
 # Example LLAVA format
 #     ll = {
