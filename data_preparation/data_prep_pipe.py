@@ -58,14 +58,18 @@ if __name__ == '__main__':
 
     for file_name in os.listdir(args.src_dir):
         if file_name.endswith(".json") and file_name != 'protein_design.json':
-            file_path = os.path.join(args.src_dir, file_name)
-            with open(file_path) as f:
-                data = json.load(f)
+            print(f"Start prepare file {file_name}")
+            try:
+                file_path = os.path.join(args.src_dir, file_name)
+                with open(file_path) as f:
+                    data = json.load(f)
 
-            llava_format = convert_mol_data_to_llava_format(data, args.count)
-            write_llava_format(llava_format, args.result_dir, file_name)
-            train, test = train_test_split(llava_format, test_size=args.percent_test, random_state=56, shuffle=True)
-            train_dir, test_dir = write_test_train(train, test, args.result_dir, file_name)
+                llava_format = convert_mol_data_to_llava_format(data, args.count)
+                write_llava_format(llava_format, args.result_dir, file_name)
+                train, test = train_test_split(llava_format, test_size=args.percent_test, random_state=56, shuffle=True)
+                train_dir, test_dir = write_test_train(train, test, args.result_dir, file_name)
+            except Exception as e:
+                raise Exception(f"Wrong data. Use protein data only.")
 
     merge_jsons(train_dir, os.path.join(args.result_dir, "train.json"))
     merge_jsons(test_dir, os.path.join(args.result_dir, "test.json"))
