@@ -4,7 +4,7 @@ import os
 
 from sklearn.model_selection import train_test_split
 
-from data_preparation.convert_mol_data_to_llava_format import convert_mol_data_to_llava_format
+from convert_mol_data_to_llava_format import convert_mol_data_to_llava_format
 
 
 def merge_jsons(dir_, save_file):
