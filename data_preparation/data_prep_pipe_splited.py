@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 
-from data_preparation.convert_mol_data_to_llava_format_splited import convert_mol_data_to_llava_format_splited
+from convert_mol_data_to_llava_format_splited import convert_mol_data_to_llava_format_splited
 
 
 def merge_jsons(dir_, save_file):
