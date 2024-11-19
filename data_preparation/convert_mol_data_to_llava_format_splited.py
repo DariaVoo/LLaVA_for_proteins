@@ -20,7 +20,7 @@ import json
 #         ]
 #     }
 
-def convert_mol_data_to_llava_format(data, max_cont=None):
+def convert_mol_data_to_llava_format_splited(data, max_cont=None):
     seq_records_train, seq_records_test = [], []
     split_types = set()
     for record in data:
