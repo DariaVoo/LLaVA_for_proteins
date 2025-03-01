@@ -31,19 +31,20 @@ def eval_model(args):
     disable_torch_init()
     model_path = os.path.expanduser(args.model_path)
     model_name = get_model_name_from_path(model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(model_path, args.model_base, model_name)
-    protein_tokenizer = model.protein_processor.get_batch_converter()
+    tokenizer, model, protein_processor, context_len = load_pretrained_model(model_path, args.model_base, model_name)
+    protein_tokenizer = protein_processor.get_batch_converter()
 
-    questions = [json.loads(q) for q in open(os.path.expanduser(args.question_file), "r")]
-    questions = get_chunk(questions, args.num_chunks, args.chunk_idx)
+    with open(os.path.expanduser(args.question_file), "r") as q:
+        questions = json.load(q)
+    # questions = json.loads(q) for q in open(os.path.expanduser(args.question_file), "r")]
+    # questions = get_chunk(questions, args.num_chunks, args.chunk_idx)
     answers_file = os.path.expanduser(args.answers_file)
     os.makedirs(os.path.dirname(answers_file), exist_ok=True)
     ans_file = open(answers_file, "w")
     for line in tqdm(questions):
-
-        idx = line["question_id"]
+        idx = line["id"]
         image_file = line["image"]
-        qs = line["text"]
+        qs = line["conversations"][0]['value']
         cur_prompt = qs
         if model.config.mm_use_im_start_end:
             qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
