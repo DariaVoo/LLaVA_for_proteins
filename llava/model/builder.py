@@ -157,7 +157,10 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
             vision_tower.load_model(device_map=device_map)
         if device_map != 'auto':
             vision_tower.to(device=device_map, dtype=torch.float16)
-        image_processor = vision_tower.image_processor
+        if getattr(vision_tower, "image_processor", None) is not None:
+            image_processor = vision_tower.image_processor
+        else:
+            image_processor = vision_tower.protein_processor
 
     if hasattr(model.config, "max_sequence_length"):
         context_len = model.config.max_sequence_length
