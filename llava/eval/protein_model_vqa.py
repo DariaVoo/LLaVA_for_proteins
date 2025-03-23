@@ -4,6 +4,7 @@ import os
 import json
 from tqdm import tqdm
 import shortuuid
+from transformers import AutoTokenizer
 
 from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from llava.conversation import conv_templates, SeparatorStyle
@@ -25,6 +26,18 @@ def get_chunk(lst, n, k):
     chunks = split_list(lst, n)
     return chunks[k]
 
+def load_torch_model(path_m):
+    model = torch.load(os.path.join(path_m, "model.pt"))
+    tokenizer = AutoTokenizer.from_pretrained(path_m, use_fast=True)
+    if hasattr(model.config, "max_sequence_length"):
+        context_len = model.config.max_sequence_length
+    else:
+        context_len = 2048
+
+    vision_tower = model.get_vision_tower()
+    image_processor = vision_tower.protein_processor
+    return tokenizer, model, image_processor, context_len
+
 
 def eval_model(args):
     # Model
@@ -32,6 +45,7 @@ def eval_model(args):
     model_path = os.path.expanduser(args.model_path)
     model_name = get_model_name_from_path(model_path)
     tokenizer, model, protein_processor, context_len = load_pretrained_model(model_path, args.model_base, model_name)
+    # tokenizer, model, protein_processor, context_len = load_torch_model(model_path)
     protein_tokenizer = protein_processor.get_batch_converter()
 
     with open(os.path.expanduser(args.question_file), "r") as q:
@@ -41,7 +55,7 @@ def eval_model(args):
     answers_file = os.path.expanduser(args.answers_file)
     os.makedirs(os.path.dirname(answers_file), exist_ok=True)
     ans_file = open(answers_file, "w")
-    for line in tqdm(questions):
+    for line in tqdm(questions[:5]):
         idx = line["id"]
         image_file = line["image"]
         qs = line["conversations"][0]['value']
@@ -49,7 +63,7 @@ def eval_model(args):
         if model.config.mm_use_im_start_end:
             qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
         else:
-            qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+            qs = qs
 
         conv = conv_templates[args.conv_mode].copy()
         conv.append_message(conv.roles[0], qs)
@@ -58,16 +72,15 @@ def eval_model(args):
 
         input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).cuda()
 
-        # todo: протестировать
         proteins = [(["id"], line["image"])]
         batch_labels, batch_strs, protein_tokens = protein_tokenizer(proteins)
-        image_tensor = protein_tokens
+        image_tensor = protein_tokens[0]
 
         with torch.inference_mode():
             output_ids = model.generate(
                 input_ids,
-                images=image_tensor.unsqueeze(0).half().cuda(),
-                # image_sizes=[image.size],
+                images=image_tensor.unsqueeze(0).cuda(),
+                image_sizes=None,
                 do_sample=True if args.temperature > 0 else False,
                 temperature=args.temperature,
                 top_p=args.top_p,
